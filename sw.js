@@ -1,7 +1,7 @@
 // Service worker: lagrer alle filene så appen virker uten nett.
 // VIKTIG: Øk VERSION hver gang du publiserer endringer, ellers får ikke telefonen dem.
 
-const VERSION = 'v1';
+const VERSION = 'v2';
 const CACHE = `yaynay-${VERSION}`;
 
 const FILES = [
@@ -10,6 +10,7 @@ const FILES = [
   'manifest.webmanifest',
   'css/app.css',
   'js/app.js',
+  'js/catalog.js',
   'js/format.js',
   'js/stats.js',
   'js/store.js',

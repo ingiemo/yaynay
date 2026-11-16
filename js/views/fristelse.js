@@ -4,6 +4,7 @@ import { store, TYPES, MOODS, AMOUNTS, WAIT_MIN, typeOf, uid } from '../store.js
 import { weekTotals, totalSpart, kgProgress, milestoneCrossed, rewardBank, lastWeek, startOfWeek, isoWeek } from '../stats.js';
 import { kcal, kr, kg, pct, num, esc, mmss, parseNum, priceInput, amountText } from '../format.js';
 import { toast, openSheet, closeSheet } from '../ui.js';
+import { suggest } from '../catalog.js';
 
 let root;
 let timer;
@@ -169,7 +170,7 @@ function renderTiles() {
     <button type="button" class="tile" data-treat="${esc(t.id)}">
       <span class="tile-emoji" aria-hidden="true">${esc(t.emoji)}</span>
       <span class="tile-name">${esc(t.name)}</span>
-      <span class="tile-meta">${num(t.kcal)} kcal</span>
+      <span class="tile-meta">${t.insteadOf ? '+' : ''}${num(t.kcal)} kcal</span>
     </button>`).join('') + `
     <button type="button" class="tile tile--new" data-new>
       <span class="tile-emoji" aria-hidden="true">+</span>
@@ -349,7 +350,9 @@ function openDecide(t) {
     label: t.name,
     onMount(sheet) {
       const out = () => {
-        sheet.querySelector('#d-out').innerHTML = `ca. <b>${kcal(t.kcal * amount)}</b> · ${kr(t.price * amount)}`;
+        const plus = t.insteadOf ? '+' : '';
+        sheet.querySelector('#d-out').innerHTML = `ca. <b>${plus}${kcal(t.kcal * amount)}</b> · ${plus}${kr(t.price * amount)}`
+          + (t.insteadOf ? `<small>i stedet for ${esc(t.insteadOf)}</small>` : '');
       };
       out();
       const atIn = sheet.querySelector('#d-at');
@@ -416,9 +419,11 @@ function openDecide(t) {
 export function openEdit(t) {
   const isNew = !t;
   let typeId = t?.typeId ?? null;
+  let emojiPick = null; // emoji fra et forslag
   // Forslag som er fylt inn automatisk. Byttes bare ut så lenge du ikke har endret feltet selv.
   let autoK = null;
   let autoP = null;
+  let autoI = null;
 
   const html = `
     <div class="sheet-top">
@@ -426,20 +431,26 @@ export function openEdit(t) {
       <button type="button" class="btn btn--ghost" data-close>Avbryt</button>
     </div>
     <form id="ef" novalidate>
-      <input class="field" name="name" placeholder="Navn, f.eks. Kvikk Lunsj" maxlength="80"
+      <input class="field" name="name" placeholder="Navn, f.eks. vin, pizza, sjokolade" maxlength="80"
         autocomplete="off" aria-label="Navn" value="${esc(t?.name ?? '')}">
+      <div class="sugg" id="ef-sugg" aria-live="polite"></div>
       <p class="label gap">Type</p>
       <div class="chips" role="radiogroup" aria-label="Type">
         ${TYPES.map((ty) => `<button type="button" class="chip" role="radio" data-type="${ty.id}" aria-checked="${ty.id === typeId}"><span aria-hidden="true">${ty.emoji}</span>${ty.name}</button>`).join('')}
       </div>
       <div class="card gap">
+        <label class="row-field" id="ef-instead-row"${t?.insteadOf || typeId === 'mat' ? '' : ' hidden'}>
+          <span>I stedet for<small>Tomt = teller fullt</small></span>
+          <span class="num-input text-input"><input name="instead" maxlength="60" placeholder="vanlig middag" value="${esc(t?.insteadOf ?? '')}"></span>
+        </label>
+        <hr id="ef-instead-hr"${t?.insteadOf || typeId === 'mat' ? '' : ' hidden'}>
         <label class="row-field">
-          <span>Kalorier<small>ca., per porsjon</small></span>
+          <span>Kalorier<small id="ef-ksub">ca., per porsjon</small></span>
           <span class="num-input"><input name="kcal" inputmode="numeric" placeholder="0" value="${t ? num(t.kcal) : ''}"><span>kcal</span></span>
         </label>
         <hr>
         <label class="row-field">
-          <span>Pris<small>per porsjon</small></span>
+          <span>Pris<small id="ef-psub">per porsjon</small></span>
           <span class="num-input"><input name="price" inputmode="decimal" placeholder="0" value="${t ? priceInput(t.price) : ''}"><span>kr</span></span>
         </label>
       </div>
@@ -452,18 +463,68 @@ export function openEdit(t) {
     label: isNew ? 'Ny fristelse' : 'Rediger fristelse',
     onMount(sheet) {
       const form = sheet.querySelector('#ef');
+      const nameIn = form.elements.name;
       const kIn = form.elements.kcal;
       const pIn = form.elements.price;
+      const iIn = form.elements.instead;
       const hint = sheet.querySelector('#ef-hint');
+      const suggBox = sheet.querySelector('#ef-sugg');
+      let shown = [];
+
+      // «I stedet for» vises for mat, eller når feltet har innhold.
+      const syncInstead = () => {
+        const on = typeId === 'mat' || iIn.value.trim() !== '';
+        sheet.querySelector('#ef-instead-row').hidden = !on;
+        sheet.querySelector('#ef-instead-hr').hidden = !on;
+        const diff = iIn.value.trim() !== '';
+        sheet.querySelector('#ef-ksub').textContent = diff ? 'forskjellen, ca.' : 'ca., per porsjon';
+        sheet.querySelector('#ef-psub').textContent = diff ? 'forskjellen' : 'per porsjon';
+        hint.textContent = diff
+          ? 'Skriv hvor mye mer det er enn det du ellers ville spist.'
+          : 'Typen gir et forslag. Sjekk gjerne pakken.';
+      };
+      iIn.addEventListener('input', syncInstead);
+
+      const selectType = (id) => {
+        typeId = id;
+        sheet.querySelectorAll('[data-type]').forEach((b) => b.setAttribute('aria-checked', String(b.dataset.type === id)));
+      };
+
+      const renderSugg = () => {
+        shown = isNew ? suggest(nameIn.value) : [];
+        suggBox.innerHTML = shown.map((c, i) => `
+          <button type="button" class="sugg-item" data-sugg="${i}">
+            <span aria-hidden="true">${c.emoji}</span>
+            <span class="sugg-name">${esc(c.name)}<small>${c.insteadOf ? `+${num(c.kcal)} kcal i stedet for ${esc(c.insteadOf)}` : `${num(c.kcal)} kcal`} · ${kr(c.price)}</small></span>
+          </button>`).join('');
+      };
+      nameIn.addEventListener('input', renderSugg);
 
       sheet.addEventListener('click', (e) => {
+        const sg = e.target.closest('[data-sugg]');
+        if (sg) {
+          const c = shown[Number(sg.dataset.sugg)];
+          nameIn.value = c.name;
+          selectType(c.typeId);
+          emojiPick = c.emoji;
+          kIn.value = autoK = num(c.kcal);
+          pIn.value = autoP = priceInput(c.price);
+          iIn.value = autoI = c.insteadOf;
+          suggBox.innerHTML = '';
+          shown = [];
+          syncInstead();
+          return;
+        }
         const c = e.target.closest('[data-type]');
         if (c) {
-          typeId = c.dataset.type;
-          sheet.querySelectorAll('[data-type]').forEach((b) => b.setAttribute('aria-checked', String(b === c)));
+          selectType(c.dataset.type);
+          emojiPick = null;
           const ty = typeOf(typeId);
           if (!kIn.value || kIn.value === autoK) { kIn.value = autoK = num(ty.kcal); }
           if (!pIn.value || pIn.value === autoP) { pIn.value = autoP = priceInput(ty.price); }
+          const defI = typeId === 'mat' ? 'vanlig middag' : '';
+          if (!iIn.value || iIn.value === autoI) { iIn.value = autoI = defI; }
+          syncInstead();
           return;
         }
         if (e.target.closest('[data-delete]')) {
@@ -477,25 +538,27 @@ export function openEdit(t) {
 
       form.addEventListener('submit', (e) => {
         e.preventDefault();
-        const name = form.elements.name.value.trim();
+        const name = nameIn.value.trim();
         const k = Math.round(parseNum(kIn.value));
         const p = Math.round(parseNum(pIn.value) * 100) / 100;
-        if (!name) { hint.textContent = 'Skriv et navn.'; form.elements.name.focus(); return; }
+        const insteadOf = iIn.value.trim().slice(0, 60);
+        if (!name) { hint.textContent = 'Skriv et navn.'; nameIn.focus(); return; }
         if (!(k > 0)) { hint.textContent = 'Skriv inn kalorier, eller velg en type.'; kIn.focus(); return; }
 
         const tid = typeId || 'annet';
-        // Bytter du type, følger emojien med. Ellers beholdes den.
-        const emoji = t && t.typeId === tid ? t.emoji : typeOf(tid).emoji;
+        // Emoji fra forslag vinner. Bytter du type, følger typens emoji med. Ellers beholdes den.
+        const emoji = emojiPick || (t && t.typeId === tid ? t.emoji : typeOf(tid).emoji);
         if (isNew) {
-          store.addTreat({ id: uid(), typeId: tid, emoji, name, kcal: k, price: p, uses: 0, createdAt: new Date().toISOString() });
+          store.addTreat({ id: uid(), typeId: tid, emoji, name, kcal: k, price: p, uses: 0, insteadOf, createdAt: new Date().toISOString() });
         } else {
-          store.updateTreat(t.id, { typeId: tid, emoji, name, kcal: k, price: p });
+          store.updateTreat(t.id, { typeId: tid, emoji, name, kcal: k, price: p, insteadOf });
         }
         closeSheet();
         toast(isNew ? `${name} er lagt til` : 'Lagret');
       });
 
-      if (isNew) form.elements.name.focus();
+      syncInstead();
+      if (isNew) nameIn.focus();
     },
   });
 }

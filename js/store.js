@@ -13,6 +13,8 @@ export const TYPES = [
   { id: 'chips',     emoji: '🍟', name: 'Chips',     kcal: 220, price: 30 },
   { id: 'brus',      emoji: '🥤', name: 'Brus',      kcal: 210, price: 40 },
   { id: 'kjeks',     emoji: '🍪', name: 'Kjeks',     kcal: 150, price: 8 },
+  { id: 'alkohol',   emoji: '🍷', name: 'Alkohol',   kcal: 125, price: 35 },
+  { id: 'mat',       emoji: '🍔', name: 'Mat',       kcal: 250, price: 50 }, // forskjell mot vanlig middag
   { id: 'annet',     emoji: '🍩', name: 'Annet',     kcal: 250, price: 30 },
 ];
 const TYPE_IDS = TYPES.map((t) => t.id);
@@ -88,6 +90,7 @@ function cleanTreat(t) {
     kcal: Math.round(numIn(t.kcal, 0, 10000, 0)),
     price: numIn(t.price, 0, 100000, 0),
     uses: Math.round(numIn(t.uses, 0, 1e6, 0)),
+    insteadOf: str(t.insteadOf, 60), // tomt = teller fullt. Ellers er kcal og pris forskjellen.
     createdAt: iso(t.createdAt) || new Date().toISOString(),
   };
 }

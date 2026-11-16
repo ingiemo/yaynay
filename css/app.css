@@ -344,6 +344,22 @@ input { font: inherit; color: inherit; }
 .week-card { margin-bottom: 14px; border-color: var(--spart); }
 .when-input { margin-top: 10px; text-align: left; }
 
+/* ---------- Forslag og «i stedet for» ---------- */
+.sugg { display: grid; gap: 6px; margin-top: 8px; }
+.sugg:empty { display: none; }
+.sugg-item {
+  display: flex; align-items: center; gap: 10px;
+  min-height: 52px; padding: 6px 14px;
+  border: 1px solid var(--border); border-radius: 14px;
+  background: var(--surface); text-align: left;
+}
+.sugg-item > span:first-child { font-size: 24px; }
+.sugg-name { font-size: 15px; font-weight: 600; }
+.sugg-name small { display: block; font-size: 13px; font-weight: 400; color: var(--muted); }
+.text-input { width: 160px; }
+.text-input input { text-align: right; font-weight: 500; }
+.amount-out small { display: block; margin-top: 2px; font-size: 14px; }
+
 /* ---------- Innstillinger ---------- */
 .decide--plain { margin-top: 14px; }
 .hint.warn { color: var(--smakt-text); font-weight: 600; }
