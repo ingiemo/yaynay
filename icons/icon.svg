@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!-- YayNay: et sukkertøy delt i to, Spart (havblå) og Smakt (bringebær). Full flate, iOS runder hjørnene selv. -->
+  <rect width="1024" height="1024" fill="#b83a68"/>
+  <g fill="#fff6f8" stroke="#fff6f8" stroke-width="36" stroke-linejoin="round">
+    <path d="M340 446 L168 338 V686 L340 578 Z"/>
+    <path d="M684 446 L856 338 V686 L684 578 Z"/>
+  </g>
+  <circle cx="512" cy="512" r="214" fill="#fff6f8"/>
+  <path d="M512 362 A150 150 0 0 0 512 662 Z" fill="#0088a6"/>
+  <path d="M512 362 A150 150 0 0 1 512 662 Z" fill="#c4407a"/>
+</svg>
